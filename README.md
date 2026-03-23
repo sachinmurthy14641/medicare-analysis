@@ -9,6 +9,7 @@ This repository contains code and analysis for Medicare Star Ratings performance
 **Key Technologies:**
 - Python (data extraction & transformation)
 - CMS Data API (healthcare data source)
+- Google BigQuery (cloud data warehouse)
 - Pandas (data manipulation)
 - Tableau Public (visualization)
 
@@ -51,16 +52,23 @@ cd medicare-star-ratings-analysis
 pip install -r requirements.txt
 ```
 
-3. Run the data pipeline:
+3. Set up Google Cloud credentials:
 ```bash
-# Pull data from CMS API
-python scripts/pull_cms_data.py
-
-# Clean and transform data
-python scripts/clean_data.py
+# Authenticate with Google Cloud
+gcloud auth application-default login
 ```
 
-4. Open the Tableau workbook:
+4. Run the data pipeline:
+```bash
+# Step 1: Pull data from CMS API and load into BigQuery
+python scripts/pull_cms_data.py
+
+# Step 2: Transform in BigQuery and export CSV for Tableau
+python scripts/transform_and_export.py
+```
+
+1. Open the Tableau workbook:
+
 - File located in `tableau/star_ratings_dashboard.twbx`
 - Or view live dashboard: [Tableau Public Link]
 
@@ -68,41 +76,46 @@ python scripts/clean_data.py
 
 ```
 medicare-star-ratings-analysis/
-├── README.md                          # This file
-├── requirements.txt                   # Python dependencies
+├── README.md                              # This file
+├── requirements.txt                       # Python dependencies
 ├── scripts/
-│   ├── pull_cms_data.py              # CMS API data extraction
-│   └── clean_data.py                 # Data cleaning & transformation
+│   ├── pull_cms_data.py                  # CMS API extraction → BigQuery raw load
+│   ├── transform_bigquery.sql            # BigQuery transformation SQL
+│   └── transform_and_export.py           # BigQuery transform + CSV export
 ├── data/
-│   ├── raw/                          # Raw API responses (not committed)
-│   │   └── star_ratings_raw.json
-│   └── processed/                    # Cleaned data for Tableau
-│       └── star_ratings_clean.csv
+│   ├── raw/                              # Raw API responses (not committed)
+│   │   └── hospital_quality_raw_*.json
+│   └── processed/                        # Cleaned data for Tableau
+│       └── hospital_quality_clean.csv
 ├── tableau/
-│   ├── star_ratings_dashboard.twbx   # Tableau workbook
-│   └── screenshots/                  # Dashboard images
+│   ├── star_ratings_dashboard.twbx       # Tableau workbook
+│   └── screenshots/                      # Dashboard images
 │       └── dashboard_preview.png
-└── .gitignore                        # Ignore raw data files
+└── .gitignore                            # Ignore raw data files
 ```
 
 ## 🔧 Data Pipeline
 
 ### 1. Data Extraction (`pull_cms_data.py`)
 
-Pulls Medicare Star Ratings data from CMS Data API:
-- **Endpoint:** CMS Medicare Part C & D Star Ratings dataset
-- **Coverage:** Multiple contract years (2020-2024)
-- **Records:** ~500+ Medicare Advantage contracts
-- **Fields:** Contract ID, organization name, ratings, measure scores
+Fetches Hospital Quality Star Ratings from the CMS Data API and loads into BigQuery:
 
-### 2. Data Transformation (`clean_data.py`)
+- **Endpoint:** `https://data.cms.gov/data-api/v1/dataset/xubh-q36u/data`
+- **Dataset:** CMS Hospital Quality Star Ratings
+- **Fields:** Facility ID/name, location, overall star rating, national comparison metrics
+- **BigQuery table:** `medicare-star-ratings.cms_data.hospital_quality_raw`
+- Saves a timestamped raw JSON snapshot to `data/raw/`
 
-Processes raw API data for analysis:
-- Standardizes column names
-- Handles missing values
-- Calculates derived metrics
-- Filters for active contracts
-- Exports clean CSV for Tableau
+### 2. Data Transformation (`transform_bigquery.sql` + `transform_and_export.py`)
+
+Runs SQL transformation in BigQuery and exports clean data for Tableau:
+
+- Casts and cleans raw fields
+- Derives `rating_category` (e.g. "4 Stars (Above Average)") and `performance_tier`
+- Adds US geographic `region` from state codes
+- Ranks hospitals by overall star rating
+- **BigQuery table:** `medicare-star-ratings.cms_data.hospital_quality_clean`
+- Exports to `data/processed/hospital_quality_clean.csv`
 
 ### 3. Visualization (Tableau)
 
@@ -135,20 +148,25 @@ From the analysis, we can identify:
 ## 🛠️ Technical Details
 
 ### API Documentation
+
 - **Source:** [CMS Data API](https://data.cms.gov/api-docs)
-- **Dataset ID:** Medicare Part C & D Star Ratings
-- **Update Frequency:** Annual (October release)
+- **Dataset:** Hospital Quality Star Ratings (`xubh-q36u`)
+- **Update Frequency:** Annual
 - **Rate Limits:** None for public endpoints
 
 ### Data Schema
 
 **Key Fields:**
-- `contract_id`: Unique plan identifier (e.g., H1234)
-- `org_name`: Parent organization name
-- `overall_rating`: Star rating (1-5)
-- `plan_type`: MA-PD, MA-only, PDP
-- `state`: Primary state of operation
-- `measure_scores`: Individual HEDIS/HOS/CAHPS measure results
+
+- `facility_id`: Unique hospital identifier
+- `facility_name`: Hospital name
+- `city`, `state`, `zip_code`, `county_name`: Location fields
+- `hospital_type`, `hospital_ownership`: Facility characteristics
+- `overall_star_rating`: Star rating (1–5)
+- `mortality_comparison`, `safety_comparison`, `readmission_comparison`, `patient_experience_comparison`, `timely_care_comparison`: National comparison metrics
+- `rating_category`: Derived label (e.g., "4 Stars (Above Average)")
+- `performance_tier`: High Performer / Average Performer / Needs Improvement
+- `region`: US geographic region derived from state
 
 ### Dependencies
 
@@ -157,6 +175,8 @@ requests>=2.31.0
 pandas>=2.0.0
 numpy>=1.24.0
 python-dotenv>=1.0.0
+google-cloud-bigquery>=3.11.0
+db-dtypes>=1.1.1
 ```
 
 ## 📊 Sample Visualizations
@@ -171,10 +191,11 @@ python-dotenv>=1.0.0
 
 This project showcases:
 
-- ✅ **Healthcare Domain Knowledge:** Understanding of CMS Star Ratings, HEDIS measures, Medicare Advantage
+- ✅ **Healthcare Domain Knowledge:** Understanding of CMS Star Ratings and hospital quality metrics
 - ✅ **API Integration:** Programmatic data extraction from public healthcare APIs
-- ✅ **Data Engineering:** ETL pipeline design, data cleaning, transformation
-- ✅ **SQL/Python Proficiency:** Data manipulation, aggregation, quality validation
+- ✅ **Cloud Data Engineering:** End-to-end ETL pipeline with Google BigQuery
+- ✅ **SQL Proficiency:** BigQuery transformation with CTEs, CASE logic, window functions
+- ✅ **Python Proficiency:** Data ingestion, BigQuery client, pandas export
 - ✅ **Data Visualization:** Tableau dashboard design for healthcare stakeholders
 - ✅ **Documentation:** Clear README, code comments, reproducible analysis
 
@@ -220,4 +241,4 @@ This project uses publicly available CMS data. All code is available under the M
 
 **Built with:** 🐍 Python • 📊 Tableau • 💾 CMS Data API • ❤️ Healthcare Analytics
 
-*Last Updated: March 18, 2026*
+*Last Updated: March 19, 2026*
