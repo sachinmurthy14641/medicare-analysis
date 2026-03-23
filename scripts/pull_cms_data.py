@@ -15,36 +15,49 @@ from datetime import datetime
 import os
 
 # Configuration
-PROJECT_ID = "medicare-star-ratings"  # Update if your project ID is different
+PROJECT_ID = "medicare-star-ratings-490720"  # Update if your project ID is different
 DATASET_ID = "cms_data"
 TABLE_ID = "hospital_quality_raw"
 
-# CMS API endpoint for Hospital Quality Star Ratings
-# This dataset contains overall quality ratings for hospitals (1-5 stars)
-# Similar to Medicare Advantage Star Ratings but for hospitals
-CMS_API_URL = "https://data.cms.gov/data-api/v1/dataset/xubh-q36u/data"
+# CMS Provider Data API endpoint for Hospital Quality Star Ratings
+# Dataset: Hospital General Information (xubh-q36u)
+CMS_API_URL = "https://data.cms.gov/provider-data/api/1/datastore/query/xubh-q36u/0"
+PAGE_SIZE = 1000
 
 def fetch_cms_data():
-    """Fetch Star Ratings data from CMS API."""
-    print("🔍 Fetching data from CMS API...")
-    
+    """Fetch all Hospital Quality Star Ratings records from CMS API with pagination."""
+    print("Fetching data from CMS API...")
+
+    all_records = []
+    offset = 0
+
     try:
-        # Make API request
-        response = requests.get(CMS_API_URL, params={"size": 1000})
-        response.raise_for_status()
-        
-        data = response.json()
-        print(f"✅ Successfully fetched {len(data)} records from CMS API")
-        
-        return data
-    
+        while True:
+            response = requests.get(CMS_API_URL, params={"limit": PAGE_SIZE, "offset": offset})
+            response.raise_for_status()
+
+            payload = response.json()
+            records = payload.get("results", [])
+            all_records.extend(records)
+
+            total = payload.get("count", 0)
+            offset += len(records)
+
+            print(f"  Fetched {offset}/{total} records...")
+
+            if offset >= total or not records:
+                break
+
+        print(f"OK: Successfully fetched {len(all_records)} records from CMS API")
+        return all_records
+
     except requests.exceptions.RequestException as e:
-        print(f"❌ Error fetching data from CMS API: {e}")
+        print(f"ERROR: Error fetching data from CMS API: {e}")
         raise
 
 def save_raw_json(data):
     """Save raw API response as JSON for reference."""
-    print("💾 Saving raw JSON data locally...")
+    print("Saving raw JSON data locally...")
     
     # Create data/raw directory if it doesn't exist
     os.makedirs("data/raw", exist_ok=True)
@@ -56,21 +69,27 @@ def save_raw_json(data):
     with open(filepath, 'w') as f:
         json.dump(data, f, indent=2)
     
-    print(f"✅ Raw data saved to: {filepath}")
+    print(f"OK: Raw data saved to: {filepath}")
     return filepath
 
 def load_to_bigquery(data):
     """Load data into BigQuery raw table."""
-    print(f"📊 Loading data to BigQuery: {PROJECT_ID}.{DATASET_ID}.{TABLE_ID}")
-    
+    print(f"Loading data to BigQuery: {PROJECT_ID}.{DATASET_ID}.{TABLE_ID}")
+
     # Convert to DataFrame
     df = pd.DataFrame(data)
-    
+
     print(f"   Data shape: {df.shape[0]} rows, {df.shape[1]} columns")
     print(f"   Columns: {', '.join(df.columns[:5])}..." if len(df.columns) > 5 else f"   Columns: {', '.join(df.columns)}")
-    
+
     # Initialize BigQuery client
     client = bigquery.Client(project=PROJECT_ID)
+
+    # Create dataset if it doesn't exist
+    dataset_ref = bigquery.Dataset(f"{PROJECT_ID}.{DATASET_ID}")
+    dataset_ref.location = "US"
+    client.create_dataset(dataset_ref, exists_ok=True)
+    print(f"   Dataset {DATASET_ID} ready")
     
     # Define table reference
     table_ref = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
@@ -89,7 +108,7 @@ def load_to_bigquery(data):
     
     # Get table info
     table = client.get_table(table_ref)
-    print(f"✅ Successfully loaded {table.num_rows} rows to BigQuery table: {table_ref}")
+    print(f"OK: Successfully loaded {table.num_rows} rows to BigQuery table: {table_ref}")
     
     return table_ref
 
@@ -114,11 +133,11 @@ def main():
         print()
         
         print("=" * 60)
-        print("✅ DATA INGESTION COMPLETE!")
+        print("DATA INGESTION COMPLETE!")
         print("=" * 60)
         print()
-        print(f"📁 Raw JSON saved: {json_filepath}")
-        print(f"📊 BigQuery table: {table_ref}")
+        print(f"Raw JSON saved: {json_filepath}")
+        print(f"BigQuery table: {table_ref}")
         print()
         print("Next steps:")
         print("1. Run: python scripts/transform_in_bigquery.py")
@@ -128,7 +147,7 @@ def main():
     except Exception as e:
         print()
         print("=" * 60)
-        print(f"❌ ERROR: {e}")
+        print(f"ERROR: {e}")
         print("=" * 60)
         raise
 
