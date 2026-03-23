@@ -1,10 +1,10 @@
-# Medicare Star Ratings Analysis
+# Hospital Quality Star Ratings Analysis
 
-A data analysis project demonstrating healthcare analytics capabilities using CMS Medicare Advantage and Part D Star Ratings data. This project showcases data ingestion from public APIs, data transformation, and visualization for quality measure performance analysis.
+A data analysis project demonstrating healthcare analytics capabilities using CMS Hospital Quality Star Ratings data. This project showcases data ingestion from public APIs, cloud-based transformation in BigQuery, and visualization for hospital quality performance analysis.
 
 ## 📊 Project Overview
 
-This repository contains code and analysis for Medicare Star Ratings performance visualization. The project pulls real-world healthcare quality data from the CMS API, processes it for analysis, and creates an interactive Tableau dashboard to identify performance trends and improvement opportunities.
+This repository contains code and analysis for CMS Hospital Quality Star Ratings performance visualization. The project pulls real-world healthcare quality data from the CMS API, loads it into Google BigQuery for transformation, and creates an interactive Tableau dashboard to identify performance trends and improvement opportunities across U.S. hospitals.
 
 **Key Technologies:**
 - Python (data extraction & transformation)
@@ -15,17 +15,19 @@ This repository contains code and analysis for Medicare Star Ratings performance
 
 ## 🎯 Business Context
 
-Medicare Star Ratings are critical quality metrics that:
-- Measure health plan performance on clinical quality and patient experience
-- Impact plan reimbursement and bonus payments
-- Guide beneficiary plan selection decisions
+CMS Hospital Quality Star Ratings are critical quality metrics that:
+
+- Measure hospital performance across mortality, safety, readmission, patient experience, and timely care
+- Help patients and families compare hospitals when making care decisions
+- Drive hospital quality improvement initiatives
 - Range from 1 to 5 stars (5 being highest quality)
 
 This analysis helps identify:
-- Top and bottom performing plans
-- Geographic performance variations
-- Measure-specific improvement opportunities
-- Year-over-year performance trends
+
+- Top and bottom performing hospitals
+- Geographic and regional performance variations
+- Domain-specific improvement opportunities (e.g., readmissions, patient experience)
+- Performance tier distribution across the U.S.
 
 ## 🚀 Quick Start
 
